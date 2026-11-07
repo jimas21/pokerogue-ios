@@ -15,19 +15,18 @@ from the official source. It is not made by or affiliated with the PokéRogue te
 
 ## How it builds
 
-No Mac is involved. Everything runs on GitHub Actions:
+No Mac is involved. Everything runs on GitHub Actions. The signing key belongs to the same Apple team as the owner's
+other app, so the two signing workflows live in that app's repository (GitHub secrets can't be shared between
+repositories) and check out this one:
 
 | Workflow | What it does |
 | --- | --- |
-| `Upstream check` | Daily. Starts `TestFlight` for a PokéRogue release that hasn't been built yet. |
-| `TestFlight` | Clones the release with its assets, runs `pnpm build:app` in offline mode (`ci/build_game.sh`), makes the icon, archives with XcodeGen + xcodebuild, signs with the App Store Connect API key and uploads. |
-| `Compile check` | Unsigned compile of the app on every push. |
+| `PokeRogue upstream check` | Daily. Starts `PokeRogue TestFlight` for a PokéRogue release that hasn't been built yet. |
+| `PokeRogue TestFlight` | Registers the bundle ID and TestFlight group (`ci/asc_setup.py`), clones the release with its assets, runs `pnpm build:app` in offline mode (`ci/build_game.sh`), makes the icon, archives with XcodeGen + xcodebuild, signs with the App Store Connect API key and uploads. |
+| `Compile check` (here) | Unsigned compile of the app on every push. No secrets. |
 
 The version shown in TestFlight is the PokéRogue release (v1.12.2.6 shows as 1.12.2); the build number is the
 workflow run number. The exact upstream commits are in the run summary.
-
-Repository settings (names only; values never go in the repo): variables `BUNDLE_ID`, `TEAM_ID`; secrets
-`ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8` (an App Store Connect Team Key with Admin access).
 
 ## Licence
 

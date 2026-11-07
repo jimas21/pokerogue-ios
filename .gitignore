@@ -33,3 +33,7 @@ xcuserdata/
 # Local notes
 .planning/
 .claude/
+
+# Python caches (hold local paths)
+__pycache__/
+*.pyc
