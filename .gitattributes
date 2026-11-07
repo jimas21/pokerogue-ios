@@ -8,3 +8,4 @@
 *.h text eol=lf
 *.py text eol=lf
 *.png binary
+*.patch text eol=lf

@@ -19,7 +19,10 @@ final class GameViewController: UIViewController {
         config.applicationNameForUserAgent = "Version/18.0 Mobile/15E148 Safari/604.1"
 
         let content = config.userContentController
-        content.addUserScript(WKUserScript(source: PageScripts.bootstrap(restore: saves.restoreLiteral()),
+        let trainerName = UserDefaults.standard.string(forKey: "trainerName")?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        content.addUserScript(WKUserScript(source: PageScripts.bootstrap(restore: saves.restoreLiteral(),
+                                                                         trainerName: trainerName),
                                            injectionTime: .atDocumentStart, forMainFrameOnly: true))
         let relay = MessageRelay(self)
         content.add(relay, name: PageScripts.savesHandler)

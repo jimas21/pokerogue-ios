@@ -6,8 +6,17 @@ enum PageScripts {
     static let savesHandler = "saves"
     static let downloadHandler = "download"
 
-    /// - Parameter restore: a JSON object literal of saved localStorage, or `null`.
-    static func bootstrap(restore: String) -> String {
+    /// - Parameters:
+    ///   - restore: a JSON object literal of saved localStorage, or `null`.
+    ///   - trainerName: the name from Settings > PokéRogue, or empty.
+    static func bootstrap(restore: String, trainerName: String) -> String {
+        // A JSON string literal (["name"] without its brackets) is a safe JavaScript string literal.
+        let json = (try? JSONSerialization.data(withJSONObject: [trainerName])).flatMap { String(data: $0, encoding: .utf8) }
+        let nameLiteral = json.map { String($0.dropFirst().dropLast()) } ?? "\"\""
+        return script(restore: restore, trainerName: nameLiteral)
+    }
+
+    private static func script(restore: String, trainerName: String) -> String {
         """
         (function () {
           "use strict";
@@ -97,12 +106,31 @@ enum PageScripts {
             if (a && tryDownload(a)) { ev.preventDefault(); }
           }, true);
 
-          // 4. "Import Data": let the file picker offer every file. iOS greys out ".prsv" files it has no type for.
+          // 4. "Import Data": let the file picker offer every file (iOS greys out ".prsv" files it has no type for),
+          //    and learn the trainer's name from the exported file's name (data_<name>.prsv, sessionData1_<name>.prsv,
+          //    runHistoryData_<name>.prsv) unless one is already set. The game reloads after an import, and the
+          //    patched login then plays under that name, moving the save over from "Guest".
           var inputClick = HTMLInputElement.prototype.click;
           HTMLInputElement.prototype.click = function () {
-            if (this.type === "file") { this.removeAttribute("accept"); }
+            if (this.type === "file") {
+              this.removeAttribute("accept");
+              this.addEventListener("change", function () {
+                var file = this.files && this.files[0];
+                var m = file && /^(?:data|sessionData\\d?|runHistoryData)_([A-Za-z0-9_-]{1,32}?)(?: \\(?\\d+\\)?)?\\.prsv$/i
+                  .exec(file.name);
+                try {
+                  if (m && m[1] !== "Guest" && !ls.getItem("offlineUsername")) { ls.setItem("offlineUsername", m[1]); }
+                } catch (e) {}
+              });
+            }
             return inputClick.apply(this, arguments);
           };
+
+          // 6. A trainer name typed in Settings > PokéRogue wins over everything.
+          var settingsName = \(trainerName);
+          try {
+            if (settingsName && /^[A-Za-z0-9_-]{1,32}$/.test(settingsName)) { ls.setItem("offlineUsername", settingsName); }
+          } catch (e) {}
 
           // 5. No text selection, magnifier or link previews on long presses.
           var style = document.createElement("style");

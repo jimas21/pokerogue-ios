@@ -24,6 +24,13 @@ if [ ! -d upstream/.git ]; then
 fi
 
 pushd upstream >/dev/null
+# Small, documented changes to the official source (patches/README.md). A patch that no longer fits a new release
+# stops the build here, so a half-patched game is never shipped.
+for patch in ../patches/*.patch; do
+  git apply --check -p1 "$patch" || die "Patch $(basename "$patch") no longer applies to $UPSTREAM_REF; update it."
+  git apply -p1 "$patch"
+  echo "Applied $(basename "$patch")"
+done
 pm="$(node -p "require('./package.json').packageManager")"
 npm install -g "$pm"
 pnpm install --frozen-lockfile
@@ -53,6 +60,7 @@ commit: ${upstream_commit}
 assets: ${assets_commit}
 locales: ${locales_commit}
 mode: app, offline (VITE_BYPASS_LOGIN=1)
+patches: $(cd patches && ls *.patch | tr '\n' ' ')
 INFO
 
 echo "Game built: $(du -sh Game | cut -f1), $(find Game -type f | wc -l | tr -d ' ') files."

@@ -1,0 +1,64 @@
+diff --git a/src/account.ts b/src/account.ts
+index 19e09b4..063717e 100644
+--- a/src/account.ts
++++ b/src/account.ts
+@@ -19,8 +19,12 @@ export async function updateUserInfo(): Promise<[success: boolean, status: numbe
+     return [true, 200];
+   }
+ 
++  // Offline app: play under the trainer's own name instead of "Guest" (set by the iOS app from an imported
++  // data_<name>.prsv file or its Settings). Moves the save from the previous name the first time a name changes.
++  const offlineName = getOfflineUsername();
++  migrateOfflineSave(offlineName);
+   loggedInUser = {
+-    username: "Guest",
++    username: offlineName,
+     lastSessionSlot: -1,
+     discordId: "",
+     googleId: "",
+@@ -49,6 +53,45 @@ export async function updateUserInfo(): Promise<[success: boolean, status: numbe
+   return [true, 200];
+ }
+ 
++const OFFLINE_SAVE_KEYS = [
++  "data",
++  "sessionData",
++  "sessionData1",
++  "sessionData2",
++  "sessionData3",
++  "sessionData4",
++  "runHistoryData",
++];
++
++/** The name to play under offline: `offlineUsername` from localStorage if valid, else "Guest". */
++function getOfflineUsername(): string {
++  try {
++    const name = (localStorage.getItem("offlineUsername") ?? "").trim();
++    return /^[A-Za-z0-9_-]{1,32}$/.test(name) ? name : "Guest";
++  } catch {
++    return "Guest";
++  }
++}
++
++/** When the offline name changes, moves each save from the previous name to the new one (never overwriting). */
++function migrateOfflineSave(name: string): void {
++  try {
++    const previous = localStorage.getItem("offlineUsernameActive") || "Guest";
++    if (previous !== name) {
++      for (const key of OFFLINE_SAVE_KEYS) {
++        const from = localStorage.getItem(`${key}_${previous}`);
++        if (from && !localStorage.getItem(`${key}_${name}`)) {
++          localStorage.setItem(`${key}_${name}`, from);
++          localStorage.removeItem(`${key}_${previous}`);
++        }
++      }
++    }
++    localStorage.setItem("offlineUsernameActive", name);
++  } catch {
++    // Storage unavailable: play as is.
++  }
++}
++
+ /**
+  * Obtain the local storage key corresponding to a given save slot.
+  * @param slotId - The numerical save slot ID
