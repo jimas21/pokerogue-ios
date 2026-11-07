@@ -1,0 +1,41 @@
+name: Compile check
+
+# Compiles the app unsigned on every push, with a stand-in game, so Swift mistakes show up in minutes without
+# building the 700 MB game or touching any secrets.
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**.md"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compile-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    runs-on: macos-26
+    timeout-minutes: 20
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Stand-in game
+        run: |
+          mkdir -p Game
+          echo '<!doctype html><title>stand-in</title>' > Game/index.html
+      - name: Install XcodeGen
+        run: brew install xcodegen || { brew update && brew install xcodegen; }
+      - name: Compile (unsigned)
+        run: |
+          xcodegen generate
+          set -o pipefail
+          xcodebuild -project PokeRogue.xcodeproj -scheme PokeRogue -configuration Release \
+            -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build 2>&1 | tee build.log \
+            | grep -E 'error:|warning:|BUILD (SUCCEEDED|FAILED)' || true
+          grep -q 'BUILD SUCCEEDED' build.log

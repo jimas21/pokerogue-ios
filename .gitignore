@@ -1,0 +1,35 @@
+# This repo is PUBLIC. Never commit game files, saves or signing material.
+
+# The game is built from the official source in CI (ci/build_game.sh)
+upstream/
+Game/
+App/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+*.prsv
+
+# Apple signing and API material
+*.p8
+*.p12
+*.cer
+*.certSigningRequest
+*.mobileprovision
+*.provisionprofile
+*.pem
+*.key
+AuthKey_*
+.env
+.env.*
+
+# Generated at build time
+*.xcodeproj
+*.xcworkspace
+build/
+build.log
+DerivedData/
+*.xcarchive
+*.ipa
+xcuserdata/
+.DS_Store
+
+# Local notes
+.planning/
+.claude/
