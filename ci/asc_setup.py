@@ -109,6 +109,37 @@ def ensure_internal_group(app_id: str) -> None:
     print(f"TestFlight: added {added} of {len(users)} team member(s) to the group.")
 
 
+def upstream_numbers(ref: str) -> tuple[str, str]:
+    """v1.12.2.6 -> ("1.12.2", "6"); v1.13.0 -> ("1.13.0", "0"). Apple allows three numbers in the version, so the
+    fourth (PokeRogue's hotfix number) becomes the build number: TestFlight shows 1.12.2 (6) for v1.12.2.6."""
+    parts = ref.lstrip("v").split(".")
+    if len(parts) not in (3, 4) or not all(p.isdigit() for p in parts):
+        raise SystemExit(f"::error::Unexpected PokeRogue release tag {ref!r} (expected vX.Y.Z or vX.Y.Z.H).")
+    return ".".join(parts[:3]), (parts[3] if len(parts) == 4 else "0")
+
+
+def choose_build_number(app_id: str) -> None:
+    """Picks the build number for this upload and exports MARKETING_VERSION and BUILD_NUMBER for later steps.
+
+    First build of a PokeRogue release: the release's own hotfix number (6 for v1.12.2.6). A rebuild of the same
+    release (an app-only fix): 6.1, 6.2, ... Each stays tied to the release, sorts after the one before, and never
+    repeats a number already on TestFlight (checked against App Store Connect itself)."""
+    version, hotfix = upstream_numbers(os.environ["UPSTREAM_REF"])
+    builds = call("GET", "/builds", query={"filter[app]": app_id, "filter[preReleaseVersion.version]": version,
+                                           "limit": "200", "fields[builds]": "version"}).get("data", [])
+    taken = {b["attributes"]["version"] for b in builds}
+    number = hotfix
+    n = 0
+    while number in taken:
+        n += 1
+        number = f"{hotfix}.{n}"
+    print(f"TestFlight version: {version} ({number}), from PokeRogue {os.environ['UPSTREAM_REF']}.")
+    with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
+        env.write(f"MARKETING_VERSION={version}\nBUILD_NUMBER={number}\n")
+    with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+        summary.write(f"**TestFlight version {version} ({number})** = PokeRogue {os.environ['UPSTREAM_REF']}\n\n")
+
+
 def main() -> int:
     identifier = os.environ["BUNDLE_ID"]
     ensure_bundle_id(identifier)
@@ -122,6 +153,8 @@ def main() -> int:
         print("  3. Bundle ID: pick the PokeRogue one this step just registered. SKU: pokerogue. Full Access.")
         return 3
     print("App record: present.")
+
+    choose_build_number(app_id)
 
     try:
         ensure_internal_group(app_id)

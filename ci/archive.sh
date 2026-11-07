@@ -3,22 +3,21 @@
 # cloud-managed distribution certificate (signing the archive made a new development certificate on every
 # fresh runner, and the account's certificate limit filled up).
 #
-# Version shown in TestFlight: the PokeRogue release it was built from, e.g. v1.12.2.6 -> 1.12.2 (Apple allows
-# three numbers; the full tag is in the build summary and in Game/BUILD-INFO.txt). Build number: the run number.
+# Version shown in TestFlight mirrors the PokeRogue release: v1.12.2.6 -> 1.12.2 (6). ci/asc_setup.py picks the
+# numbers (MARKETING_VERSION, BUILD_NUMBER); a rebuild of the same release becomes 6.1, 6.2, ...
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=common.sh
 source "$here/common.sh"
 cd "$here/.."
 
-for name in BUNDLE_ID TEAM_ID ASC_KEY_PATH ASC_KEY_ID ASC_ISSUER_ID GITHUB_RUN_NUMBER UPSTREAM_REF; do
-  [ -n "${!name:-}" ] || die "$name is not set"
+for name in BUNDLE_ID TEAM_ID ASC_KEY_PATH ASC_KEY_ID ASC_ISSUER_ID UPSTREAM_REF MARKETING_VERSION BUILD_NUMBER; do
+  [ -n "${!name:-}" ] || die "$name is not set (ci/asc_setup.py sets the version numbers)"
 done
 test -f Game/index.html || die "Game/ is missing; ci/build_game.sh must run first."
 test -f App/Assets.xcassets/AppIcon.appiconset/AppIcon.png || die "App icon is missing; ci/make_icon.py must run first."
-
-marketing="$(echo "${UPSTREAM_REF#v}" | cut -d. -f1-3)"
-[[ "$marketing" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "Could not make a version from $UPSTREAM_REF"
+[[ "$MARKETING_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "Bad MARKETING_VERSION $MARKETING_VERSION"
+[[ "$BUILD_NUMBER" =~ ^[0-9]+(\.[0-9]+)?$ ]] || die "Bad BUILD_NUMBER $BUILD_NUMBER"
 
 asc_auth_flags
 mkdir -p build
@@ -38,7 +37,7 @@ MSG
 }
 trap hints ERR
 
-echo "Version $marketing (build $GITHUB_RUN_NUMBER) from PokeRogue $UPSTREAM_REF"
+echo "Version $MARKETING_VERSION ($BUILD_NUMBER) from PokeRogue $UPSTREAM_REF"
 xcodegen generate
 
 xcodebuild \
@@ -52,8 +51,8 @@ xcodebuild \
   DEVELOPMENT_TEAM="$TEAM_ID" \
   CODE_SIGN_STYLE=Automatic \
   CODE_SIGNING_ALLOWED=NO \
-  MARKETING_VERSION="$marketing" \
-  CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+  MARKETING_VERSION="$MARKETING_VERSION" \
+  CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
   archive 2>&1 | tee build/archive.log
 
 trap - ERR
